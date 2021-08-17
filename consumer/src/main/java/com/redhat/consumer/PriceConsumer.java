@@ -44,12 +44,12 @@ public class PriceConsumer implements Runnable {
     @Override
     public void run() {
         try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
-            JMSConsumer consumer = context.createConsumer(context.createTopic("prices"));
+            JMSConsumer consumer = context.createConsumer(context.createTopic("topic.prices"));
             while (true) {
                 Message message = consumer.receive();
                 if (message == null) return;
                 String numReceived = message.getBody(String.class);
-                System.out.println("==> Número consumido = " + numReceived);
+                System.out.println("==> Numero consumido = " + numReceived);
                 lastPrice = numReceived;
             }
         } catch (JMSException e) {
