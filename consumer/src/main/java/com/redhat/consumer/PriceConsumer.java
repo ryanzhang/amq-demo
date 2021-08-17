@@ -48,7 +48,9 @@ public class PriceConsumer implements Runnable {
             while (true) {
                 Message message = consumer.receive();
                 if (message == null) return;
-                lastPrice = message.getBody(String.class);
+                String numReceived = message.getBody(String.class);
+                System.out.println("Número consumido = " + numReceived);
+                lastPrice = numReceived;
             }
         } catch (JMSException e) {
             throw new RuntimeException(e);

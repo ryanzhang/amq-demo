@@ -122,3 +122,5 @@ public class PriceConsumer implements Runnable {
     }
 }
 ----
+
+kubectl -n amq-streams-demo run kafka-producer-topic1 -it --image=quay.io/strimzi/kafka:0.25.0-kafka-2.7.0 --rm=true --restart=Never -- bin/kafka-console-producer.sh --broker-list my-cluster-kafka-bootstrap.amq-streams-demo.svc:9092 --topic my-topic
