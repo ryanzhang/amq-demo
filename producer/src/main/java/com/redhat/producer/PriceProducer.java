@@ -40,7 +40,8 @@ public class PriceProducer implements Runnable {
         try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
             Integer num = random.nextInt(100);
             System.out.println(num);
-            context.createProducer().send(context.createQueue("prices"), Integer.toString(num));
+            // context.createProducer().send(context.createQueue("prices"), Integer.toString(num));
+            context.createProducer().send(context.createTopic("prices"), Integer.toString(num));
         }
     }
 }
