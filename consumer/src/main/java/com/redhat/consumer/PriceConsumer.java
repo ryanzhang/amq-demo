@@ -49,7 +49,7 @@ public class PriceConsumer implements Runnable {
                 Message message = consumer.receive();
                 if (message == null) return;
                 String numReceived = message.getBody(String.class);
-                System.out.println("Número consumido = " + numReceived);
+                System.out.println("==> Número consumido = " + numReceived);
                 lastPrice = numReceived;
             }
         } catch (JMSException e) {
