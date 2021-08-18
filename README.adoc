@@ -1,126 +1,186 @@
-= AMQ Demo
+= AMQ Broker/AMQ Streams Demo
+:imagesdir: imgs
+:toc:
+:toc-title: Conteúdo
+:icons:
+:toc-placement!:
 
-== Producer
+Demo showing Kafka and Artemis on top of OpenShift.
 
-mvn io.quarkus:quarkus-maven-plugin:2.1.2.Final:create \
-    -DprojectGroupId=com.redhat \
-    -DprojectArtifactId=producer \
-    -Dextensions="resteasy,artemis-jms"
+image::3-8-2021-11-42-55-AM.png[]
+
+== Pre-req
+
+For this demonstration, we will need:
+
+* OpenShift 4.8.x
+
+== AMQ Broker Demo (Artemis)
+
+=== Creating AMQ Broker project
+
+image::3-8-2021-10-39-05-AM.png[]
+
+image::3-8-2021-10-40-04-AM.png[]
+
+=== Deploying AMQ Broker Operator
+
+image::3-8-2021-10-41-59-AM.png[]
+
+image::3-8-2021-10-42-30-AM.png[]
+
+image::3-8-2021-10-43-05-AM.png[]
+
+image::3-8-2021-10-43-33-AM.png[]
+
+Switch to developer console
+
+image::3-8-2021-10-50-15-AM.png[]
+
+We should see the container Operator
+
+image::3-8-2021-10-51-07-AM.png[]
+
+=== Deploying AMQ Broker
+
+image::3-8-2021-10-53-25-AM.png[]
+
+image::3-8-2021-10-53-50-AM.png[]
+
+image::3-8-2021-10-54-09-AM.png[]
+
+image::3-8-2021-11-01-15-AM.png[]
+
+[source,yaml]
+----
+apiVersion: broker.amq.io/v2alpha4
+kind: ActiveMQArtemis
+metadata:
+  name: amq-broker
+  application: amq-broker-app
+  namespace: amq-broker-demo
+spec:
+  deploymentPlan:
+    size: 2
+    persistenceEnabled: false
+    requireLogin: false
+    messageMigration: false
+    managementRBACEnabled: true
+    journalType: nio
+    jolokiaAgentEnabled: false
+    image: placeholder
+  acceptors:
+  - name: all
+    protocols: all
+    port: 61617
+----
+
+image::3-8-2021-11-06-46-AM.png[]
+
+=== Deploying producer and consumer
+
+==== Producer
+
+Right click on topology page
+
+image::3-8-2021-11-16-37-AM.png[]
+
+image::3-8-2021-11-19-02-AM.png[]
+
+image::3-8-2021-11-19-54-AM.png[]
+
+image::3-8-2021-11-28-50-AM.png[]
+
+We can check the logs to see if the producer app is working properly.
+
+image::3-8-2021-11-31-09-AM.png[]
+
+image::3-8-2021-11-32-16-AM.png[]
+
+==== Consumer
+
+Right click on topology page
+
+image::3-8-2021-11-16-37-AM.png[]
+
+image::3-8-2021-11-34-29-AM.png[]
+
+image::3-8-2021-11-36-03-AM.png[]
+
+image::3-8-2021-11-41-19-AM.png[]
+
+We can check the logs to see if the consumer app is working properly.
+
+image::3-8-2021-11-43-33-AM.png[]
+
+image::3-8-2021-11-51-26-AM.png[]
+
+== Camel K Demo
+
+=== Deploying Camel K Operator
+
+image::3-8-2021-11-52-54-AM.png[]
+
+image::3-8-2021-12-05-52-PM.png[]
+
+image::3-8-2021-12-06-23-PM.png[]
+
+image::3-8-2021-12-08-47-PM.png[]
+
+=== Deploying Camel K integration
+
+Create a new file `AMQBrokerIntegration.java` with the following content:
 
 [source,java]
 ----
-package com.redhat.producer;
+// camel-k: dependency=camel-activemq
 
-import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import org.apache.camel.builder.RouteBuilder;
+import org.apache.activemq.ActiveMQConnectionFactory;
+import org.apache.camel.BindToRegistry;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.event.Observes;
-import javax.inject.Inject;
-import javax.jms.ConnectionFactory;
-import javax.jms.JMSContext;
-import javax.jms.Session;
-
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
-
-/**
- * A bean producing random prices every 5 seconds and sending them to the prices JMS queue.
- */
-@ApplicationScoped
-public class PriceProducer implements Runnable {
-
-    @Inject
-    ConnectionFactory connectionFactory;
-
-    private final Random random = new Random();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
-    void onStart(@Observes StartupEvent ev) {
-        scheduler.scheduleWithFixedDelay(this, 0L, 5L, TimeUnit.SECONDS);
-    }
-
-    void onStop(@Observes ShutdownEvent ev) {
-        scheduler.shutdown();
+public class AMQBrokerIntegration extends RouteBuilder {
+    @BindToRegistry
+    public ActiveMQConnectionFactory registerActiveMQConnectionFactory() {
+        System.out.println("ActiveMQ Listener: STARTING...");
+        ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory();
+        connectionFactory.setBrokerURL("tcp://ex-aao-hdls-svc:61617");
+        connectionFactory.setUserName("admin");
+        connectionFactory.setPassword("redhat");
+        connectionFactory.setUseAsyncSend(false);
+        connectionFactory.setClientID("Message Topic");
+        connectionFactory.setConnectResponseTimeout(300);
+        System.out.println("ActiveMQ Listener: STARTED");
+        return connectionFactory;
     }
 
     @Override
-    public void run() {
-        try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
-            context.createProducer().send(context.createQueue("prices"), Integer.toString(random.nextInt(100)));
-        }
+    public void configure() throws Exception {
+      from("activemq:topic:topic.prices")
+        .log("body = ${body}")
+        ;
     }
 }
 ----
 
-== Consumer
+Now run it:
 
-mvn io.quarkus:quarkus-maven-plugin:2.1.2.Final:create \
-    -DprojectGroupId=com.redhat \
-    -DprojectArtifactId=consumer \
-    -Dextensions="resteasy,artemis-jms"
-
-[source,java]
+[source,bash]
 ----
-package com.redhat.consumer;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.event.Observes;
-import javax.inject.Inject;
-import javax.jms.ConnectionFactory;
-import javax.jms.JMSConsumer;
-import javax.jms.JMSContext;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.Session;
-
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
-
-/**
- * A bean consuming prices from the JMS queue.
- */
-@ApplicationScoped
-public class PriceConsumer implements Runnable {
-
-    @Inject
-    ConnectionFactory connectionFactory;
-
-    private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
-
-    private volatile String lastPrice;
-
-    public String getLastPrice() {
-        return lastPrice;
-    }
-
-    void onStart(@Observes StartupEvent ev) {
-        scheduler.submit(this);
-    }
-
-    void onStop(@Observes ShutdownEvent ev) {
-        scheduler.shutdown();
-    }
-
-    @Override
-    public void run() {
-        try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
-            JMSConsumer consumer = context.createConsumer(context.createQueue("prices"));
-            while (true) {
-                Message message = consumer.receive();
-                if (message == null) return;
-                lastPrice = message.getBody(String.class);
-            }
-        } catch (JMSException e) {
-            throw new RuntimeException(e);
-        }
-    }
-}
+oc project amq-broker-demo
+kamel run AMQBrokerIntegration.java --dev
 ----
+
+We can find the link to download the `kamel` command line on the top right help icon.
+
+image::3-8-2021-12-13-52-PM.png[]
+
+Now we should see the logging of our camel route. 
+
+image::3-8-2021-12-20-04-PM.png[]
+
+image::3-8-2021-12-24-10-PM.png[]
+
+== AMQ Streams Demo (Kafka)
 
 kubectl -n amq-streams-demo run kafka-producer-topic1 -it --image=quay.io/strimzi/kafka:0.25.0-kafka-2.7.0 --rm=true --restart=Never -- bin/kafka-console-producer.sh --broker-list my-cluster-kafka-bootstrap.amq-streams-demo.svc:9092 --topic my-topic
