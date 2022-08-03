@@ -9,7 +9,7 @@ public class AMQBrokerIntegration extends RouteBuilder {
     public ActiveMQConnectionFactory registerActiveMQConnectionFactory() {
         System.out.println("ActiveMQ Listener: STARTING...");
         ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory();
-        connectionFactory.setBrokerURL("tcp://ex-aao-hdls-svc:61616");
+        connectionFactory.setBrokerURL("tcp://ex-aao-hdls-svc.amq-broker.svc.cluster.local:61616");
         connectionFactory.setUserName("admin");
         connectionFactory.setPassword("redhat");
         connectionFactory.setUseAsyncSend(false);
